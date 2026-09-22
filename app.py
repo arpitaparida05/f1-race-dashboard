@@ -1,5 +1,4 @@
 import os
-import tempfile
 import streamlit as st
 import fastf1
 import plotly.express as px
@@ -9,10 +8,7 @@ import pandas as pd
 st.set_page_config(page_title="F1 Race Telemetry & Strategy Dashboard", layout="wide")
 st.title("🏎️ F1 Race Strategy & Degradation Dashboard")
 
-# Set cache inside the operating system temp directory
-cache_dir = os.path.join(tempfile.gettempdir(), "fastf1_cache")
-os.makedirs(cache_dir, exist_ok=True)
-fastf1.Cache.enable_cache(cache_dir)
+# Suppress verbose FastF1 logger messages
 fastf1.set_log_level("ERROR")
 
 # Sidebar race selectors
@@ -23,7 +19,8 @@ grand_prix = st.sidebar.selectbox("Grand Prix", ["Monaco", "Bahrain", "Silversto
 @st.cache_data(show_spinner=False)
 def load_race_laps(year_val, gp_val):
     session = fastf1.get_session(year_val, gp_val, "R")
-    session.load(telemetry=False, weather=False, messages=False)
+    # Load all core timing and lap data
+    session.load()
     
     raw_laps = session.laps
     
