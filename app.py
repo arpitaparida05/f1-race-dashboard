@@ -1,3 +1,5 @@
+import os
+import tempfile
 import streamlit as st
 import fastf1
 import plotly.express as px
@@ -7,7 +9,10 @@ import pandas as pd
 st.set_page_config(page_title="F1 Race Telemetry & Strategy Dashboard", layout="wide")
 st.title("🏎️ F1 Race Strategy & Degradation Dashboard")
 
-# Suppress debug logs
+# Set cache inside the operating system temp directory
+cache_dir = os.path.join(tempfile.gettempdir(), "fastf1_cache")
+os.makedirs(cache_dir, exist_ok=True)
+fastf1.Cache.enable_cache(cache_dir)
 fastf1.set_log_level("ERROR")
 
 # Sidebar race selectors
@@ -18,9 +23,8 @@ grand_prix = st.sidebar.selectbox("Grand Prix", ["Monaco", "Bahrain", "Silversto
 @st.cache_data(show_spinner=False)
 def load_race_laps(year_val, gp_val):
     session = fastf1.get_session(year_val, gp_val, "R")
-    session.load()
+    session.load(telemetry=False, weather=False, messages=False)
     
-    # Extract only what we need into a standard DataFrame
     raw_laps = session.laps
     
     df = pd.DataFrame({
@@ -53,7 +57,6 @@ default_d2 = "LEC" if "LEC" in driver_codes else driver_codes[1]
 driver1 = st.sidebar.selectbox("Primary Driver", driver_codes, index=driver_codes.index(default_d1))
 driver2 = st.sidebar.selectbox("Comparison Driver", driver_codes, index=driver_codes.index(default_d2))
 
-# Filter driver slices
 d1_laps = laps[laps["Driver"] == driver1]
 d2_laps = laps[laps["Driver"] == driver2]
 
