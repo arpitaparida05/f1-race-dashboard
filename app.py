@@ -1,4 +1,3 @@
-import os
 import streamlit as st
 import fastf1
 import plotly.express as px
@@ -8,11 +7,8 @@ import pandas as pd
 st.set_page_config(page_title="F1 Race Telemetry & Strategy Dashboard", layout="wide")
 st.title("🏎️ F1 Race Strategy & Degradation Dashboard")
 
-# Set up local cache
-cache_dir = "cache"
-if not os.path.exists(cache_dir):
-    os.makedirs(cache_dir)
-fastf1.Cache.enable_cache(cache_dir)
+# Suppress debug logs
+fastf1.set_log_level("ERROR")
 
 # Sidebar race selectors
 st.sidebar.header("Session Selection")
@@ -20,24 +16,34 @@ year = st.sidebar.selectbox("Year", [2024, 2023], index=0)
 grand_prix = st.sidebar.selectbox("Grand Prix", ["Monaco", "Bahrain", "Silverstone", "Monza"], index=0)
 
 @st.cache_data(show_spinner=False)
-def load_race_data(year_val, gp_val):
+def load_race_laps(year_val, gp_val):
     session = fastf1.get_session(year_val, gp_val, "R")
-    session.load(laps=True, telemetry=False, weather=False, messages=False)
+    session.load()
     
-    # Process clean laps
-    laps = session.laps.copy()
-    laps["LapTimeSeconds"] = laps["LapTime"].dt.total_seconds()
+    # Extract only what we need into a standard DataFrame
+    raw_laps = session.laps
     
-    # Strip pit-lane laps to isolate racing pace
-    clean_laps = laps.loc[(laps["PitInTime"].isna()) & (laps["PitOutTime"].isna())].copy()
+    df = pd.DataFrame({
+        "Driver": raw_laps["Driver"],
+        "LapNumber": raw_laps["LapNumber"],
+        "LapTime": raw_laps["LapTime"],
+        "Compound": raw_laps["Compound"],
+        "TyreLife": raw_laps["TyreLife"],
+        "Stint": raw_laps["Stint"],
+        "PitInTime": raw_laps["PitInTime"],
+        "PitOutTime": raw_laps["PitOutTime"],
+    })
     
-    # Extract driver code abbreviations
-    driver_codes = sorted(list(clean_laps["Driver"].unique()))
+    df["LapTimeSeconds"] = df["LapTime"].dt.total_seconds()
     
+    # Strip pit-lane laps to isolate true racing pace
+    clean_laps = df.loc[(df["PitInTime"].isna()) & (df["PitOutTime"].isna())].dropna(subset=["LapTimeSeconds"]).copy()
+    
+    driver_codes = sorted([str(d) for d in clean_laps["Driver"].dropna().unique()])
     return clean_laps, driver_codes
 
 with st.spinner("Fetching F1 timing and stint data..."):
-    laps, driver_codes = load_race_data(year, grand_prix)
+    laps, driver_codes = load_race_laps(year, grand_prix)
 
 # Sidebar driver comparisons
 st.sidebar.header("Driver Comparison")
@@ -104,6 +110,6 @@ fig_evolution = px.box(
 )
 fig_evolution.update_layout(
     template="plotly_dark",
-    yaxis_range=[laps["LapTimeSeconds"].quantile(0.01), laps["LapTimeSeconds"].quantile(0.95)]
+    yaxis_range=[laps["LapTimeSeconds"].quantile(0.02), laps["LapTimeSeconds"].quantile(0.95)]
 )
 st.plotly_chart(fig_evolution, use_container_width=True)
