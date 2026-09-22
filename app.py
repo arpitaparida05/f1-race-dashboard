@@ -22,7 +22,7 @@ grand_prix = st.sidebar.selectbox("Grand Prix", ["Monaco", "Bahrain", "Silversto
 @st.cache_data(show_spinner=False)
 def load_race_data(year_val, gp_val):
     session = fastf1.get_session(year_val, gp_val, "R")
-    session.load(telemetry=False, weather=False)
+    session.load(laps=True, telemetry=False, weather=False, messages=False)
     
     # Process clean laps
     laps = session.laps.copy()
