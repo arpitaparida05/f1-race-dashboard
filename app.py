@@ -5,46 +5,51 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 
-# 1. Page Configuration & Caching Setup
 st.set_page_config(page_title="F1 Race Telemetry & Strategy Dashboard", layout="wide")
 st.title("🏎️ F1 Race Strategy & Degradation Dashboard")
 
+# Set up local cache
 cache_dir = "cache"
 if not os.path.exists(cache_dir):
     os.makedirs(cache_dir)
 fastf1.Cache.enable_cache(cache_dir)
 
-# 2. Sidebar Filters
+# Sidebar race selectors
 st.sidebar.header("Session Selection")
 year = st.sidebar.selectbox("Year", [2024, 2023], index=0)
 grand_prix = st.sidebar.selectbox("Grand Prix", ["Monaco", "Bahrain", "Silverstone", "Monza"], index=0)
 
-@st.cache_data
-def load_race_data(year, gp):
-    session = fastf1.get_session(year, gp, "R")
-    session.load()
-    laps = session.laps.copy()
+@st.cache_data(show_spinner=False)
+def load_race_data(year_val, gp_val):
+    session = fastf1.get_session(year_val, gp_val, "R")
+    session.load(telemetry=False, weather=False)
     
-    # Convert LapTime timedelta to seconds for numerical plotting
+    # Process clean laps
+    laps = session.laps.copy()
     laps["LapTimeSeconds"] = laps["LapTime"].dt.total_seconds()
     
-    # Filter out pit in/out laps to isolate true racing pace
-    clean_laps = laps.loc[(laps["PitInTime"].isna()) & (laps["PitOutTime"].isna())]
-    return clean_laps, session.drivers, session
+    # Strip pit-lane laps to isolate racing pace
+    clean_laps = laps.loc[(laps["PitInTime"].isna()) & (laps["PitOutTime"].isna())].copy()
+    
+    # Extract driver code abbreviations
+    driver_codes = sorted(list(clean_laps["Driver"].unique()))
+    
+    return clean_laps, driver_codes
 
-with st.spinner("Fetching F1 Telemetry..."):
-    laps, driver_numbers, session = load_race_data(year, grand_prix)
+with st.spinner("Fetching F1 timing and stint data..."):
+    laps, driver_codes = load_race_data(year, grand_prix)
 
-# Map driver numbers to 3-letter abbreviation codes
-driver_codes = sorted([session.get_driver(d)["Abbreviation"] for d in driver_numbers])
-
+# Sidebar driver comparisons
 st.sidebar.header("Driver Comparison")
-driver1 = st.sidebar.selectbox("Primary Driver", driver_codes, index=driver_codes.index("VER") if "VER" in driver_codes else 0)
-driver2 = st.sidebar.selectbox("Comparison Driver", driver_codes, index=driver_codes.index("LEC") if "LEC" in driver_codes else 1)
+default_d1 = "VER" if "VER" in driver_codes else driver_codes[0]
+default_d2 = "LEC" if "LEC" in driver_codes else driver_codes[1]
 
-# Filter Data for Selected Drivers
-d1_laps = laps.pick_driver(driver1)
-d2_laps = laps.pick_driver(driver2)
+driver1 = st.sidebar.selectbox("Primary Driver", driver_codes, index=driver_codes.index(default_d1))
+driver2 = st.sidebar.selectbox("Comparison Driver", driver_codes, index=driver_codes.index(default_d2))
+
+# Filter driver slices
+d1_laps = laps[laps["Driver"] == driver1]
+d2_laps = laps[laps["Driver"] == driver2]
 
 # --- Visual 1: Lap-by-Lap Pace Comparison ---
 st.subheader(f"1. Lap Pace: {driver1} vs {driver2}")
