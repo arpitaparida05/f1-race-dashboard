@@ -27,3 +27,22 @@ A production-grade Formula 1 race strategy and telemetry analysis console. This 
 * **Data Processing:** Pandas, NumPy, Statsmodels (OLS regression)
 * **Visualization:** Plotly Graph Objects (`go`), Plotly Express (`px`)
 * **Deployment & UI:** Streamlit Cloud, Custom CSS
+
+---
+
+## 📊 Analytical Methodology
+
+1. **Telemetry & Lap Ingestion:** Data is fetched using the `FastF1` API core sessions.
+2. **Noise Isolation:** Pit in-laps and out-laps (`PitInTime` and `PitOutTime`) are removed to prevent artificial pace distortion.
+3. **Degradation Modeling:** Stint degradation curves are estimated via Ordinary Least Squares:
+   $$\text{LapTime} = \beta_0 + \beta_1 \cdot \text{TyreLife} + \epsilon$$
+   where $\beta_1$ isolates the compound degradation rate in seconds per lap.
+
+---
+
+## 🚀 Running Locally
+
+### 1. Clone the Repository
+```bash
+git clone [https://github.com/arpitaparida05/f1-race-dashboard.git](https://github.com/arpitaparida05/f1-race-dashboard.git)
+cd f1-race-dashboard
