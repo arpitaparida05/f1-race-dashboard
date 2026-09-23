@@ -60,11 +60,37 @@ COMPOUND_COLORS = {
     "WET": "#00AEEF"
 }
 
+# --- Dynamic Dataset Scanner ---
+def get_available_sessions():
+    data_dir = "data"
+    if not os.path.exists(data_dir):
+        return {}
+    
+    files = [f for f in os.listdir(data_dir) if f.endswith("_laps.csv")]
+    session_map = {}
+    for f in files:
+        parts = f.replace("_laps.csv", "").split("_")
+        if len(parts) >= 2:
+            yr = int(parts[0])
+            gp = parts[1].capitalize()
+            session_map.setdefault(yr, []).append(gp)
+            
+    return session_map
+
+available_sessions = get_available_sessions()
+
+if not available_sessions:
+    st.error("No lap files found in data/ directory. Run fetch_data.py first.")
+    st.stop()
+
 # --- Sidebar Controls ---
 with st.sidebar:
     st.markdown("### 🏎️ **Session Control**")
-    year = st.selectbox("Season", [2024], index=0)
-    grand_prix = st.selectbox("Grand Prix", ["Monaco", "Bahrain", "Silverstone", "Monza"], index=0)
+    available_years = sorted(list(available_sessions.keys()), reverse=True)
+    year = st.selectbox("Season", available_years, index=0)
+    
+    available_gps = sorted(available_sessions[year])
+    grand_prix = st.selectbox("Grand Prix", available_gps, index=0)
     st.divider()
 
 # --- Data Loading ---
