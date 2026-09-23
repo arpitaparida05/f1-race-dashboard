@@ -1,6 +1,5 @@
 import os
 import streamlit as st
-import fastf1
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -8,43 +7,23 @@ import pandas as pd
 st.set_page_config(page_title="F1 Race Telemetry & Strategy Dashboard", layout="wide")
 st.title("🏎️ F1 Race Strategy & Degradation Dashboard")
 
-# Suppress verbose FastF1 logger messages
-fastf1.set_log_level("ERROR")
-
 # Sidebar race selectors
 st.sidebar.header("Session Selection")
-year = st.sidebar.selectbox("Year", [2024, 2023], index=0)
+year = st.sidebar.selectbox("Year", [2024], index=0)
 grand_prix = st.sidebar.selectbox("Grand Prix", ["Monaco", "Bahrain", "Silverstone", "Monza"], index=0)
 
-@st.cache_data(show_spinner=False)
+@st.cache_data
 def load_race_laps(year_val, gp_val):
-    session = fastf1.get_session(year_val, gp_val, "R")
-    # Load all core timing and lap data
-    session.load()
-    
-    raw_laps = session.laps
-    
-    df = pd.DataFrame({
-        "Driver": raw_laps["Driver"],
-        "LapNumber": raw_laps["LapNumber"],
-        "LapTime": raw_laps["LapTime"],
-        "Compound": raw_laps["Compound"],
-        "TyreLife": raw_laps["TyreLife"],
-        "Stint": raw_laps["Stint"],
-        "PitInTime": raw_laps["PitInTime"],
-        "PitOutTime": raw_laps["PitOutTime"],
-    })
-    
-    df["LapTimeSeconds"] = df["LapTime"].dt.total_seconds()
-    
-    # Strip pit-lane laps to isolate true racing pace
-    clean_laps = df.loc[(df["PitInTime"].isna()) & (df["PitOutTime"].isna())].dropna(subset=["LapTimeSeconds"]).copy()
-    
+    file_path = f"data/{year_val}_{gp_val.lower()}_laps.csv"
+    if not os.path.exists(file_path):
+        st.error(f"Data file {file_path} not found.")
+        st.stop()
+        
+    clean_laps = pd.read_csv(file_path)
     driver_codes = sorted([str(d) for d in clean_laps["Driver"].dropna().unique()])
     return clean_laps, driver_codes
 
-with st.spinner("Fetching F1 timing and stint data..."):
-    laps, driver_codes = load_race_laps(year, grand_prix)
+laps, driver_codes = load_race_laps(year, grand_prix)
 
 # Sidebar driver comparisons
 st.sidebar.header("Driver Comparison")
